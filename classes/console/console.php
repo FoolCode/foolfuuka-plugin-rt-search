@@ -7,7 +7,6 @@ use Foolz\FoolFrame\Model\DoctrineConnection;
 use Foolz\FoolFrame\Model\Preferences;
 use Foolz\FoolFuuka\Model\Radix;
 use Foolz\FoolFuuka\Model\RadixCollection;
-use Foolz\FoolFuuka\Plugins\RtSearch\Model\RtSearch as RT;
 use Foolz\SphinxQL\Drivers\Mysqli\Connection;
 use Foolz\SphinxQL\SphinxQL;
 use Symfony\Component\Console\Command\Command;
@@ -39,11 +38,6 @@ class Console extends Command
     protected $sphinx_conn;
 
     /**
-     * @var
-     */
-    protected $rt_search;
-
-    /**
      * @var RadixCollection
      */
     protected $radix_coll;
@@ -54,7 +48,6 @@ class Console extends Command
         $this->preferences = $context->getService('preferences');
         $this->dc = $context->getService('doctrine');
         $this->radix_coll = $context->getService('foolfuuka.radix_collection');
-        $this->rt_search = $context->getService('foolfuuka-plugin.rt_search');
         parent::__construct();
     }
 
@@ -95,7 +88,7 @@ class Console extends Command
                     continue;
                 }
 
-                $this->rtSearch($output, $board);
+                $this->rtSearchPerBoard($output, $board);
                 sleep(1);
             }
         }
@@ -103,7 +96,7 @@ class Console extends Command
 
     protected function getSphinxql()
     {
-        if ($this->sphinx_conn === null) {
+        if (!$this->sphinx_conn) {
             $sphinx_config = explode(':', $this->preferences->get('foolfuuka.sphinx.listen'));
             $this->sphinx_conn = new Connection();
             $this->sphinx_conn->setParams([
@@ -120,15 +113,13 @@ class Console extends Command
      * @param $output
      * @param Radix $board
      */
-    public function rt_search_per_board($output, $board)
+    public function rtSearchPerBoard($output, $board)
     {
-        //$preferences_key = 'foolfuuka.plugins.rt_search.board.'.$board->shortname.'.latest_doc_id';
-        $latest_doc_id = $this->getLatestDocIdFromSphinx();// $this->preferences->get($preferences_key, );
+        $latest_doc_id = $this->getLatestDocIdFromSphinx($board);
 
         $res = $this->dc->qb()
             ->select('*')
             ->from($board->getTable(), 'r')
-            ->leftJoin('r', $board->getTable('_images'), 'mg', 'mg.media_id = r.media_id')
             ->andWhere('doc_id > :latest_doc_id')
             ->orderBy('doc_id', 'ASC')
             ->setMaxResults(25000)
@@ -137,28 +128,47 @@ class Console extends Command
             ->fetchAll();
 
         $sphinxql = $this->getSphinxql();
-        //$last_doc_id = 0;
         foreach ($res as $row) {
             $sphinxql->insert()
-                ->into($board->shortname.'_rt')
-                ->values([]);
+                ->into($board->shortname.'_delta')
+                ->set([
+                    'num' => $row->num,
+                    'subnum' => $row->subnum,
+                    'tnum' => $row->thread_num,
+                    'cap' => $row->capcode,
+                    'board' => $board->id,
+                    'mid' => $row->media_id,
+                    'pip' => $row->poster_ip,
+                    'has_image' => !!$row->media_filename,
+                    'is_internal' => !!$row->subnum,
+                    'is_spoiler' => $row->spoiler,
+                    'is_deleted' => $row->deleted,
+                    'is_sticky' => $row->sticky,
+                    'is_op' => $row->op,
+                    'timestamp' => $row->timestamp,
+
+                    'trip' => $row->trip,
+                    'email' => $row->email,
+                    'title' => $row->title,
+                    'comment' => $row->comment,
+                    'media_filename' => $row->media_filename,
+                    'media_hash' => $row->media_hash,
+                    'country' => $row->poster_country
+                ]);
 
             $sphinxql = $sphinxql->enqueue();
-            //$last_doc_id = $row->doc_id;
         }
 
         $sphinxql->executeBatch();
-        //$this->preferences->set($preferences_key, $last_doc_id);
     }
 
     protected function getLatestDocIdFromSphinx($board) {
         $res = $this->getSphinxql()
             ->select(SphinxQL::expr('MAX(doc_id)'))
-            ->from($board->shortname.'_rt', $board->shortname.'_main', $board->shortname.'_ancient')
+            ->from($board->shortname.'_delta', $board->shortname.'_main', $board->shortname.'_ancient')
             ->execute()
             ->fetchAssoc();
 
         return $res['MAX(doc_id)'];
     }
-
 }
