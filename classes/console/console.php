@@ -160,8 +160,10 @@ class Console extends Command
                     'country' => $row['poster_country']
                 ], function ($x) { return !is_null($x); }));
 
-            $sphinxql->execute();
+            $sphinxql->enqueue();
         }
+
+        $sphinxql->executeBatch();
     }
 
     protected function getLatestDocIdFromSphinx($board) {
