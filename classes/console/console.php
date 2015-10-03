@@ -69,27 +69,33 @@ class Console extends Command
     {
         if (($radix = $input->getOption('radix')) !== null) {
             if ($this->radix_coll->getByShortname($radix) !== false) {
-                $this->rtSearch($output, $radix);
+                $this->rtSearch($input, $output, $radix);
             } else {
                 $output->writeln('<error>'._i('Wrong radix (board short name) specified.').'</error>');
             }
         } else {
-            $this->rtSearch($output);
+            $this->rtSearch($input, $output);
         }
     }
 
-    public function rtSearch($output, $shortname = null)
+    public function rtSearch($input, $output, $shortname = null)
     {
         $boards = $this->radix_coll->getAll();
 
-        while (true) {
+        $cron = true;
+        while (true === $cron) {
             foreach ($boards as $board) {
                 if (!is_null($shortname) && $shortname != $board->shortname) {
                     continue;
                 }
 
-                $this->rtSearchPerBoard($output, $board);
-                sleep(1);
+                if ($input->getOption('purge')) {
+                    $this->rtPurgePerBoard($output, $board);
+                    $cron = false;
+                } else {
+                    $this->rtSearchPerBoard($output, $board);
+                    sleep(1);
+                }
             }
         }
     }
@@ -107,6 +113,12 @@ class Console extends Command
         }
 
         return new SphinxQL($this->sphinx_conn);
+    }
+
+    public function rtPurgePerBoard($output, $board)
+    {
+        $output->writeln(date("Y-m-d H:i:s").' - Purging /'.$board->shortname.'/...');
+        $this->getSphinxql()->query('TRUNCATE RTINDEX '.$board->shortname.'_delta')->execute();
     }
 
     /**
