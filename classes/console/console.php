@@ -121,9 +121,9 @@ class Console extends Command
         $res = $this->dc->qb()
             ->select('*')
             ->from($board->getTable(), 'r')
-            ->andWhere('doc_id > :latest_doc_id')
+            ->where('doc_id > :latest_doc_id')
             ->orderBy('doc_id', 'ASC')
-            ->setMaxResults(1000)
+            ->setMaxResults(5000)
             ->setParameter(':latest_doc_id', $latest_doc_id)
             ->execute()
             ->fetchAll();
@@ -161,13 +161,7 @@ class Console extends Command
                     'country' => $row['poster_country']
                 ], function ($x) { return !is_null($x); }));
 
-            $sphinxql->enqueue();
-        }
-
-        try {
-            $sphinxql->executeBatch();
-        } catch (\Foolz\SphinxQL\Exception\SphinxQLException $e) {
-            $output->writeln(date("Y-m-d H:i:s").' - Done.');
+            $sphinxql->execute();
         }
     }
 
