@@ -115,6 +115,7 @@ class Console extends Command
      */
     public function rtSearchPerBoard($output, $board)
     {
+        $output->writeln(date("Y-m-d H:i:s").' - Indexing /'.$board->shortname.'/...');
         $latest_doc_id = $this->getLatestDocIdFromSphinx($board);
 
         $res = $this->dc->qb()
@@ -122,7 +123,7 @@ class Console extends Command
             ->from($board->getTable(), 'r')
             ->andWhere('doc_id > :latest_doc_id')
             ->orderBy('doc_id', 'ASC')
-            ->setMaxResults(10000)
+            ->setMaxResults(1000)
             ->setParameter(':latest_doc_id', $latest_doc_id)
             ->execute()
             ->fetchAll();
@@ -163,8 +164,13 @@ class Console extends Command
             $sphinxql->enqueue();
         }
 
-        $sphinxql->executeBatch();
+        try {
+            $sphinxql->executeBatch();
+        } catch (\Foolz\SphinxQL\Exception\SphinxQLException $e) {
+            $output->writeln(date("Y-m-d H:i:s").' - Done.');
+        }
     }
+
 
     protected function getLatestDocIdFromSphinx($board) {
         $res = $this->getSphinxql()
