@@ -122,7 +122,7 @@ class Console extends Command
             ->from($board->getTable(), 'r')
             ->andWhere('doc_id > :latest_doc_id')
             ->orderBy('doc_id', 'ASC')
-            ->setMaxResults(25000)
+            ->setMaxResults(10000)
             ->setParameter(':latest_doc_id', $latest_doc_id)
             ->execute()
             ->fetchAll();
@@ -131,44 +131,45 @@ class Console extends Command
         foreach ($res as $row) {
             $sphinxql->insert()
                 ->into($board->shortname.'_delta')
-                ->set([
-                    'num' => $row->num,
-                    'subnum' => $row->subnum,
-                    'tnum' => $row->thread_num,
-                    'cap' => $row->capcode,
+                ->set(array_filter([
+                    'id' => $row['doc_id'],
+                    'num' => $row['num'],
+                    'subnum' => $row['subnum'],
+                    'tnum' => $row['thread_num'],
+                    'cap' => ord($row['capcode']),
                     'board' => $board->id,
-                    'mid' => $row->media_id,
-                    'pip' => $row->poster_ip,
-                    'has_image' => !!$row->media_filename,
-                    'is_internal' => !!$row->subnum,
-                    'is_spoiler' => $row->spoiler,
-                    'is_deleted' => $row->deleted,
-                    'is_sticky' => $row->sticky,
-                    'is_op' => $row->op,
-                    'timestamp' => $row->timestamp,
+                    'mid' => $row['media_id'],
+                    'pip' => $row['poster_ip'],
+                    'has_image' => !!$row['media_filename'],
+                    'is_internal' => !!$row['subnum'],
+                    'is_spoiler' => $row['spoiler'],
+                    'is_deleted' => $row['deleted'],
+                    'is_sticky' => $row['sticky'],
+                    'is_locked' => $row['locked'],
+                    'is_op' => $row['op'],
+                    'timestamp' => $row['timestamp'],
 
-                    'trip' => $row->trip,
-                    'email' => $row->email,
-                    'title' => $row->title,
-                    'comment' => $row->comment,
-                    'media_filename' => $row->media_filename,
-                    'media_hash' => $row->media_hash,
-                    'country' => $row->poster_country
-                ]);
+                    'name' => $row['name'],
+                    'trip' => $row['trip'],
+                    'email' => $row['email'],
+                    'title' => $row['title'],
+                    'comment' => $row['comment'],
+                    'media_filename' => $row['media_filename'],
+                    'media_orig' => $row['media_orig'],
+                    'media_hash' => $row['media_hash'],
+                    'country' => $row['poster_country']
+                ], function ($x) { return !is_null($x); }));
 
-            $sphinxql = $sphinxql->enqueue();
+            $sphinxql->execute();
         }
-
-        $sphinxql->executeBatch();
     }
 
     protected function getLatestDocIdFromSphinx($board) {
         $res = $this->getSphinxql()
-            ->select(SphinxQL::expr('MAX(doc_id)'))
+            ->select(SphinxQL::expr('MAX(id)'))
             ->from($board->shortname.'_delta', $board->shortname.'_main', $board->shortname.'_ancient')
-            ->execute()
-            ->fetchAssoc();
+            ->execute()[0];
 
-        return $res['MAX(doc_id)'];
+        return $res['max(id)'];
     }
 }

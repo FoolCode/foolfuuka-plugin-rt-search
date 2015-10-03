@@ -16,7 +16,7 @@ class HHVM_RT
                 $autoloader = $context->getService('autoloader');
 
                 $autoloader->addClassMap([
-                    'Foolz\FoolFuuka\Plugins\RtSearch\Model\RtSearch' => __DIR__ . '/classes/model/rt_search.php'
+                    'Foolz\FoolFuuka\Plugins\RtSearch\Console\Console' => __DIR__ . '/classes/console/console.php'
                 ]);
 
                 Event::forge('Foolz\FoolFrame\Model\Context::handleConsole#obj.app')
